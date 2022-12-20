@@ -32,6 +32,3 @@ def try_request(ip, request="select * from sakila.country;"):
     stop = False
     while not stop:
         stop = connect_to_server(ip, request)
-
-
-try_request("3.80.202.43")

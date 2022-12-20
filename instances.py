@@ -38,36 +38,41 @@ class EC2Instances:
         return self.client.create_key_pair(KeyName=key_name)
 
     def create_instances(self, private_ip_address, tag, user_data=""):
-        self.instances.extend(
-            self.client.run_instances(
-                ImageId=self.image_id,
-                MinCount=1,
-                MaxCount=1,
-                InstanceType=self.type,
-                KeyName=self.key_pair['KeyName'],
-                UserData=user_data,
-                SecurityGroupIds=self.security_group_ids,
-                SubnetId='subnet-0d6af2ce628f6f9e2',
-                PrivateIpAddress=private_ip_address,
-                TagSpecifications=[
-                    {
-                        'ResourceType': 'instance',
-                        'Tags': [
-                            {
-                                'Key': 'Name',
-                                'Value': tag
-                            },
-                        ]
-                    },
-                ]
-            )
+        new_instance = self.client.run_instances(
+            ImageId=self.image_id,
+            MinCount=1,
+            MaxCount=1,
+            InstanceType=self.type,
+            KeyName=self.key_pair['KeyName'],
+            UserData=user_data,
+            SecurityGroupIds=self.security_group_ids,
+            SubnetId='subnet-012b1459537c6e6dc',  # us-east1a
+            PrivateIpAddress=private_ip_address,
+            TagSpecifications=[
+                {
+                    'ResourceType': 'instance',
+                    'Tags': [
+                        {
+                            'Key': 'Name',
+                            'Value': tag
+                        },
+                    ]
+                },
+            ]
         )
+        self.instances.extend(new_instance['Instances'])
         return self.instances
 
     def terminate_all(self):
-        for instance in self.instances:
-            instance.terminate()
-            instance.wait_until_terminated()
+        try:
+            ids = []
+            waiter = self.client.get_waiter('instance_terminated')
+            for instance in self.instances:
+                ids.append(instance['InstanceId'])
+            self.client.terminate_instances(InstanceIds=ids)
+            waiter.wait(InstanceIds=ids)
+        except Exception as e:
+            print("ERROR : Failed to terminate instances with {}".format(e))
 
     def delete_key_pair(self):
         self.client.delete_key_pair(KeyName=self.key_pair['KeyName'])

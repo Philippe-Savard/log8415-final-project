@@ -12,17 +12,17 @@ class SecurityGroup:
         self.session = Session(profile_name='default')
         self.client = self.session.client('ec2')
         self.security_group = self.client.create_security_group(
-            Description="Security groupe for {}.".format(name), 
+            Description="Security group for {}.".format(name),
             GroupName=name,
             VpcId=vpc_id
         )
-        
+
         if len(ingress_rules) == 0:
             ingress_rules.append(
                 {
-                    'IpProtocol': 'tcp', 
-                    'FromPort': 0, 
-                    'ToPort': 65535, # TCP/IP ports on IPv4 are bounded between 0 and 65535.
+                    'IpProtocol': 'tcp',
+                    'FromPort': 0,
+                    'ToPort': 65535,  # TCP/IP ports on IPv4 are bounded between 0 and 65535.
                     'IpRanges': [{'CidrIp': '0.0.0.0/0'}]
                 }
             )
@@ -35,9 +35,9 @@ class SecurityGroup:
         if len(egress_rules) == 0:
             egress_rules.append(
                 {
-                    'IpProtocol': 'tcp', 
-                    'FromPort': 0, 
-                    'ToPort': 65535, # TCP/IP ports on IPv4 are bounded between 0 and 65535.
+                    'IpProtocol': 'tcp',
+                    'FromPort': 0,
+                    'ToPort': 65535,  # TCP/IP ports on IPv4 are bounded between 0 and 65535.
                     'IpRanges': [{'CidrIp': '0.0.0.0/0'}]
                 }
             )

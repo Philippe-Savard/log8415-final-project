@@ -3,8 +3,8 @@ from instances import EC2Instances
 from security_group import SecurityGroup
 
 ip_addresses = {
-    'ndb_mgmd': "10.0.0.1",
-    'ndbd': ["10.0.0.2", "10.0.0.3", "10.0.0.4"]
+    'ndb_mgmd': "172.31.0.4",
+    'ndbd': ["172.31.0.5", "172.31.0.6", "172.31.0.7"]
 }
 
 if __name__ == "__main__":
@@ -24,24 +24,28 @@ if __name__ == "__main__":
     try:
         # Create management node
         ndb_mgmd_data = ""
-        with open('ndb_mgmd_config.sh', 'r') as file:
+        with open('instances_config/ndb_mgmd_config.sh', 'r') as file:
             ndb_mgmd_data = file.read()
 
-        mysqlc_nodes.create_instances(ip_addresses["ndb_mgmd"], "ndb_mgmd", ndb_mgmd_data)
+        ndb_mgmd_id = mysqlc_nodes.create_instances(ip_addresses["ndb_mgmd"], "ndb_mgmd", ndb_mgmd_data)[0]['InstanceId']
+        print("ndb_mgmd node created with ID : {}".format(ndb_mgmd_id))
 
         # Create data nodes
         ndbd_data = ""
-        with open('ndbd_config.sh', 'r') as file:
+        with open('instances_config/ndbd_config.sh', 'r') as file:
             ndbd_data = file.read()
 
-        for ip in ip_addresses["ndbd"]:
-            mysqlc_nodes.create_instances(ip, "ndbd", ndbd_data)
+        for i, ip in enumerate(ip_addresses["ndbd"]):
+            ndbd_id = mysqlc_nodes.create_instances(ip, "ndbd", ndbd_data)[1 + i]['InstanceId']
+            print("ndbd_{} node created with ID : {}".format(1 + i, ndbd_id))
+
+        waiter = ec2_client.get_waiter('instance_running')
+        ids = []
+        for instance in mysqlc_nodes.instances:
+            ids.append(instance['InstanceId'])
 
         print("Waiting for all instances to be running")
-        for instance in mysqlc_nodes.instances:
-            id = instance.instance_id
-            instance.wait_until_running()
-            print("Instance {} as successfully been created and is running.".format(id))
+        waiter.wait(InstanceIds=ids)
 
         input("Press ENTER to terminate all instances...")
 
