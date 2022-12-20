@@ -1,16 +1,16 @@
-from threading import Thread
 from boto3 import Session
 
 
 class EC2Instances:
 
-    def __init__(self, image_id, instance_type, key_name) -> None:
+    def __init__(self, image_id, security_group_ids, instance_type, key_name) -> None:
         self.session = Session(profile_name='default')
         self.client = self.session.client('ec2')
         self.ressource = self.session.resource('ec2')
         self.image_id = image_id
         self.type = instance_type
         self.instances = []
+        self.security_group_ids = security_group_ids
         self.key_pair = self.create_key_pair(key_name)
 
     def create_key_pair(self, key_name):
@@ -37,36 +37,31 @@ class EC2Instances:
 
         return self.client.create_key_pair(KeyName=key_name)
 
-    def create_instances(self, tag, count, security_group_id, user_data=""):
-        tag_spec = [
-            {
-                'ResourceType': 'instance',
-                'Tags': [
+    def create_instances(self, private_ip_address, tag, user_data=""):
+        self.instances.extend(
+            self.client.run_instances(
+                ImageId=self.image_id,
+                MinCount=1,
+                MaxCount=1,
+                InstanceType=self.type,
+                KeyName=self.key_pair['KeyName'],
+                UserData=user_data,
+                SecurityGroupIds=self.security_group_ids,
+                SubnetId='subnet-0d6af2ce628f6f9e2',
+                PrivateIpAddress=private_ip_address,
+                TagSpecifications=[
                     {
-                        'Key': 'Name',
-                        'Value': tag
+                        'ResourceType': 'instance',
+                        'Tags': [
+                            {
+                                'Key': 'Name',
+                                'Value': tag
+                            },
+                        ]
                     },
                 ]
-            },
-        ]
-        monitoring = {
-            'Enabled': True,
-        }
-        instance_params = {
-            'ImageId': self.image_id,
-            'InstanceType': self.type,
-            'KeyName': self.key_pair['KeyName'],
-            'SecurityGroupIds': [security_group_id],
-            'TagSpecifications': tag_spec,
-            'Monitoring': monitoring,
-            'UserData': user_data
-        }
-
-        self.instances = self.ressource.create_instances(**instance_params, MinCount=count, MaxCount=count)
-
-        for instance in self.instances:
-            instance.wait_until_running()
-
+            )
+        )
         return self.instances
 
     def terminate_all(self):

@@ -1,7 +1,11 @@
 import boto3
-from instances import *
-from security_group import *
-from ssh_connection import *
+from instances import EC2Instances
+from security_group import SecurityGroup
+
+ip_addresses = {
+    'ndb_mgmd': "10.0.0.1",
+    'ndbd': ["10.0.0.2", "10.0.0.3", "10.0.0.4"]
+}
 
 if __name__ == "__main__":
     session = boto3.Session(profile_name='default')
@@ -13,62 +17,38 @@ if __name__ == "__main__":
 
     image_id = 'ami-08c40ec9ead489470'
 
-    mysql_nodes = EC2Instances(image_id, instance_type="t2.micro", key_name="vockey")
+    sg_mysql = SecurityGroup(vpc_id, name="mysql_group")
 
-    ip_in_rules = [
-        {
-            'IpProtocol': 'tcp', 'FromPort': 80, 'ToPort': 80,
-            'IpRanges': [{'CidrIp': '0.0.0.0/0'}]
-        },
-        {
-            'IpProtocol': 'tcp', 'FromPort': 443, 'ToPort': 443,
-            'IpRanges': [{'CidrIp': '0.0.0.0/0'}]
-        },
-        {
-            'IpProtocol': 'tcp', 'FromPort': 22, 'ToPort': 22,
-            'IpRanges': [{'CidrIp': '0.0.0.0/0'}]
-        }
-    ]
-
-    ip_out_rules = [
-        {
-            'IpProtocol': 'tcp', 'FromPort': 80, 'ToPort': 80,
-            'IpRanges': [{'CidrIp': '0.0.0.0/0'}]
-        },
-        {
-            'IpProtocol': 'tcp', 'FromPort': 443, 'ToPort': 443,
-            'IpRanges': [{'CidrIp': '0.0.0.0/0'}]
-        }
-    ]
-
-    sg_mysql = SecurityGroup(vpc_id, name="mysql_group", description="default", ingress_rules=ip_in_rules, egress_rules=ip_out_rules)
-
-    instances = None
+    mysqlc_nodes = EC2Instances(image_id, [sg_mysql.security_group['GroupId']], instance_type="t2.micro", key_name="vockey")
 
     try:
-        user_data = ""
-        with open('replica_config.sh', 'r') as file:
-            user_data = file.read()
+        # Create management node
+        ndb_mgmd_data = ""
+        with open('ndb_mgmd_config.sh', 'r') as file:
+            ndb_mgmd_data = file.read()
 
-        instances = mysql_nodes.create_instances("mysql_slaves", 1, sg_mysql.security_group['GroupId'], user_data)
-        print(instances)
+        mysqlc_nodes.create_instances(ip_addresses["ndb_mgmd"], "ndb_mgmd", ndb_mgmd_data)
 
-        #instance = ec2_resource.Instance(instance.id)
-        input("instance is ready, press a key to terminate...")
-        # public_ip = instances.public_ip_address
-        # print(public_ip)
-        # TODO: Remove the file transfer since we will clone the git repository
-        # folder_path = os.path.curdir
-        # files = [
-        #     os.path.join(folder_path, "install.sh"),
-        #     os.path.join(folder_path, '4300.txt'),
-        # ]
-        ##start_deployment(public_ip, files, commands, key_pair["KeyMaterial"])
+        # Create data nodes
+        ndbd_data = ""
+        with open('ndbd_config.sh', 'r') as file:
+            ndbd_data = file.read()
+
+        for ip in ip_addresses["ndbd"]:
+            mysqlc_nodes.create_instances(ip, "ndbd", ndbd_data)
+
+        print("Waiting for all instances to be running")
+        for instance in mysqlc_nodes.instances:
+            id = instance.instance_id
+            instance.wait_until_running()
+            print("Instance {} as successfully been created and is running.".format(id))
+
+        input("Press ENTER to terminate all instances...")
 
     except Exception as e:
         print(e)
-
     finally:
-        mysql_nodes.terminate_all()
+        print("Removing instances...")
+        mysqlc_nodes.terminate_all()
         # mysql_nodes.delete_key_pair()
         sg_mysql.delete()
