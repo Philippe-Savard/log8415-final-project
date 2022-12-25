@@ -3,6 +3,7 @@
 # Run on all nodes
 service mysqld stop
 yum remove mysql-server mysql mysql-devel
+
 mkdir -p /opt/mysqlcluster/home
 cd /opt/mysqlcluster/home
 mkdir mysqlc
@@ -21,4 +22,4 @@ apt-get -y install libncurses5
 #Run only on data nodes
 mkdir -p /opt/mysqlcluster/deploy/ndb_data
 cd /opt/mysqlcluster/home/mysqlc
-bin/ndbd -c ip-172-31-0-4.ec2.internal:1186
+bin/ndbd -c ip-172-31-0-5.ec2.internal:1186
