@@ -20,7 +20,7 @@ pip install pythonping
 pip install paramiko
 
 # Get the flaskapp.py file from the git repository
-wget https://raw.githubusercontent.com/Philippe-Savard/test8415/main/flaskapp.py
+wget https://raw.githubusercontent.com/Philippe-Savard/log8415-final-project/main/app/flaskapp.py
 
 echo "
 from flaskapp import app
